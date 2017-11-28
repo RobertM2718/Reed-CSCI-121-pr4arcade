@@ -171,8 +171,8 @@ class Host(Frame): #inherit from Game?
             self.command_string += "|" + agent.color()
             point_list = agent.shape()
             for p in point_list:
-                self.command_string += ":" + str(p.x) + "," + str(p.y)
-                
+                self.command_string += ":" + str(round(p.x, 3)) + "," + str(round(p.y, 3)) #the 3 here is a magic number.  
+                #Adding round() here - it shouldn't reduce display accuracy by much, but it ought to cut down the size of the command string by a lot.  
         self.pass_output()
 #        print(self.command_string)
 #        self.num_frames += 1
