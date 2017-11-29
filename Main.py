@@ -55,8 +55,13 @@ while True:
         print ("Initializing Host")
         h = Host.Host("No", 60, 45, 800, 600, 'wrapped', 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
         while not h.GAME_OVER:
-            time.sleep(1.0/60)
+            t_1 = time.time()
             h.update()
+            t_2 = time.time()
+            to_wait = (1.0/60 - (t_2 - t_1))
+#            if to_wait > 0:
+#                print("waited")
+            time.sleep(max(to_wait, 0))
     elif h_or_c == "client" or h_or_c == "Client":
         c = Client.Client("Asteroids Arena", 60, 45, 800, 600, 'wrapped', 0)
         #???? There needs to be some way of verifying that a proper connection was formed.  

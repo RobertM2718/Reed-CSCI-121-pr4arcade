@@ -91,6 +91,10 @@ class Host(Frame): #inherit from Game?
         
     def drop_connection(self, cn):
         print("Client at", cn[1], "dropped")
+        ship_index = self.connections.index(cn)
+        ship = self.ships[ship_index]
+        self.ships.remove(ship) #to fix the problem with the ships staying around after the connection dropped.  
+        self.agents.remove(ship)
         cn[0].close()
         self.connections.remove(cn)
         if len(self.connections) == 0:
