@@ -31,6 +31,21 @@ import sys
 import Game 
 import PlayAsteroids
 import socket
+import math
+
+
+
+THRUST_KEY = 'w'
+BRAKE_KEY = 's' #is braking something I want to allow?
+LEFT_KEY = 'a'
+RIGHT_KEY = 'd'
+FIRE_KEY = ' '
+#QUIT_KEY = 'q'
+
+#with f as open("bindings.txt", 'r'):
+#    line = f.readline()
+#    while line != None:
+        
 
 class Client(Frame):
     
@@ -50,6 +65,7 @@ class Client(Frame):
         self.root = Tk()
         self.root.title(name)
         Frame.__init__(self, self.root)
+        self.root.config(cursor='none') #mouse hiding test
         self.canvas = Canvas(self.root, width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
 
         # Handle mouse pointer motion and keypress events.
@@ -64,7 +80,7 @@ class Client(Frame):
         #my stuff:
 #        self.ship_ID = None #change this later
         #should this report_strings info instead be in Ship?  
-        self.report_strings = {"thrust": 0, "spin": 0, "firing_photons": False, "firing_missiles": False}
+        self.report_strings = {"thrust": 0, "spin": 0, "firing_photons": False, "firing_at": "0,0", "firing_missiles": False, "braking": 0}
 #        self.create_dict = {"MovingBody": PlayAsteroids.MovingBody, "Shootable": PlayAsteroids.Shootable, 
 #                            "Asteroid": PlayAsteroids.Asteroid, "ParentAsteroid": PlayAsteroids.ParentAsteroid,
 #                            "Ember": PlayAsteroids.Ember, "ShrapnelAsteroid": PlayAsteroids.ShrapnelAsteroid,
@@ -72,6 +88,8 @@ class Client(Frame):
 #                            "LargeAsteroid": PlayAsteroids.LargeAsteroid, "Photon": PlayAsteroids.Photon, 
 #                            "Ship": PlayAsteroids.Ship}
         self.draw_string = ""
+        self.target_angle_1 = 45
+        self.target_angle_2 = 135
 
         self.canvas.pack()
         if console_lines > 0:
@@ -143,9 +161,42 @@ class Client(Frame):
                 points = points + [Point2D(x, y)]
             self.draw_shape(points, color)
         
+        t_s = self.target_shapes_and_colors()
+        for tri in t_s:
+#            print("drawing target")
+            self.draw_shape(tri[0], tri[1])
+                            
+        self.target_angle_1 = (self.target_angle_1 + 4) % 360 #arbitrary
+        self.target_angle_2 = (self.target_angle_2 - 4) % 360 #also, arbitrary
+        
+        
         Frame.update(self)
         self.receive_output() #maybe this?  Also, I need to clean up these comments.  
+    
+    def target_shapes_and_colors(self):
+#        def get_heading(self):
+#        angle = self.angle * math.pi / 180.0
+#        return Vector2D(math.cos(angle), math.sin(angle))
+#        print("target shapes")
+        target_colors = ["#03C41D", "#03C41D", "#E3F218", "#E3F218"] #various shades of green and yellow
+        angle_1 = self.target_angle_1 * math.pi/180.0
+        angle_2 = self.target_angle_2 * math.pi/180.0
         
+        vec_1 = Vector2D(math.cos(angle_1), math.sin(angle_1))
+        vec_2 = Vector2D(math.cos(angle_2), math.sin(angle_2))
+        
+        vecs = [vec_1, vec_1 * (-1.0), vec_2, vec_2 * (-1.0)]
+        shapes = []
+        for i in range(len(vecs)):
+            v = vecs[i]
+            h = v.perp()
+            p1 = self.mouse_position + v * 0.5 #numbers are determined arbitrarily
+            p2 = self.mouse_position + v * 1.0 + h * 0.2 
+            p3 = self.mouse_position + v * 1.0 - h * 0.2 #forgot a minus sign here - that was the error earlier, I think
+            shapes.append(([p1, p2, p3], target_colors[i]))
+        return shapes
+        
+    
     def draw_shape(self, shape, color):
 #        print(shape)
 #        print(color)
@@ -168,15 +219,18 @@ class Client(Frame):
         
     def handle_mouse_motion(self,event): #client
         self.mouse_position = self.window_to_world(event.x,event.y)
+        self.report_strings["firing_at"] = str(self.mouse_position.x) + "," + str(self.mouse_position.y)
         #print("MOUSE MOVED",self.mouse_position,self.mouse_down)
 
     def handle_mouse_press(self,event): #client
         self.mouse_down = True
+        self.report_strings["firing_photons"] = True
         self.handle_mouse_motion(event)
         #print("MOUSE CLICKED",self.mouse_down)
 
     def handle_mouse_release(self,event): #client
         self.mouse_down = False
+        self.report_strings["firing_photons"] = False
         self.handle_mouse_motion(event)
         #print("MOUSE RELEASED",self.mouse_down)
 
@@ -190,30 +244,40 @@ class Client(Frame):
 #        self.photon_cooldown = 0 #ticks till another photon can be launched
 #        self.firing_missiles = "False"
 #        self.
-        if event.char == 'i':
-            if self.report_strings["thrust"] < 1: #This style might make things a little awkward.  
-                self.report_strings["thrust"] += 1
-        elif event.char == 'j':
+        if event.char == THRUST_KEY:
+#            if self.report_strings["thrust"] < 1: #This style might make things a little awkward.  
+#                self.report_strings["thrust"] += 1
+            self.report_strings["thrust"] = 1
+        elif event.char == LEFT_KEY:
             if self.report_strings["spin"] < 1:
                 self.report_strings["spin"] += 1
-        elif event.char == 'l':
+        elif event.char == RIGHT_KEY:
             if self.report_strings["spin"] > -1:
                 self.report_strings["spin"] -= 1
-        elif event.char == ' ':
-            self.report_strings["firing_photons"] = True
+#        elif event.char == FIRE_KEY:
+#            self.report_strings["firing_photons"] = True
+        elif event.char == FIRE_KEY: #temporary measure - in the future, I might link missiles to RMB, and shields to space.  
+            self.report_strings["firing_missiles"] = True
+        elif event.char == BRAKE_KEY:
+            self.report_strings["braking"] = 1
             
     def handle_keyrelease(self, event):
-        if event.char == "i":
-            if self.report_strings["thrust"] > -1:
-                self.report_strings["thrust"] -= 1
-        elif event.char == 'j':
+        if event.char == THRUST_KEY:
+#            if self.report_strings["thrust"] > -1:
+#                self.report_strings["thrust"] -= 1
+            self.report_strings["thrust"] = 0
+        elif event.char == LEFT_KEY:
             if self.report_strings["spin"] > -1:
                 self.report_strings["spin"] -= 1
-        elif event.char == 'l':
+        elif event.char == RIGHT_KEY:
             if self.report_strings["spin"] < 1:
                 self.report_strings["spin"] += 1
-        elif event.char == ' ':
-            self.report_strings["firing_photons"] = False
+#        elif event.char == FIRE_KEY:
+#            self.report_strings["firing_photons"] = False
+        elif event.char == FIRE_KEY:
+            self.report_strings["firing_missiles"] = False
+        elif event.char == BRAKE_KEY:
+            self.report_strings["braking"] = 0
         
         
     

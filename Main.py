@@ -16,13 +16,14 @@ import time
 #c.set_host(h)
 
 
-
+TOP = 'wrapped' #should probably be 'wrapped'; 'bound' causes an error which freezes the game.  
 #c.add(Game.Agent(Point2D(100, 100), c, "7AB")) #I got an error where many windows were opened.  What?  
 #error doesn't seem to be critical.  
 
 while True:
     h_or_c = input("Host or Client?  ")
-    if h_or_c == "host" or h_or_c == "Host":
+#    if h_or_c == "host" or h_or_c == "Host":
+    if h_or_c.lower() == "host": #More convenient
 #        default_address = socket.gethostbyname(socket.gethostname())
 #        address = input("Address?  (probably best to stick with 'localhost'  ")
 #        while True:
@@ -53,7 +54,7 @@ while True:
                 continue #will this work?
             break
         print ("Initializing Host")
-        h = Host.Host("No", 60, 45, 800, 600, 'wrapped', 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
+        h = Host.Host("No", 60, 45, 800, 600, TOP, 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
         while not h.GAME_OVER:
             t_1 = time.time()
             h.update()
@@ -62,8 +63,9 @@ while True:
 #            if to_wait > 0:
 #                print("waited")
             time.sleep(max(to_wait, 0))
-    elif h_or_c == "client" or h_or_c == "Client":
-        c = Client.Client("Asteroids Arena", 60, 45, 800, 600, 'wrapped', 0)
+#    elif h_or_c == "client" or h_or_c == "Client":
+    elif h_or_c.lower() == "client":
+        c = Client.Client("Asteroids Arena", 60, 45, 800, 600, TOP, 0)
         #???? There needs to be some way of verifying that a proper connection was formed.  
         #Note: there sort of is: I could use try/except with a ConnectionRefusedError.  Maybe a few other errors, too.  
 #        address = input("Host address?  Example: 'localhost'  ") #example may need to be changed

@@ -93,6 +93,7 @@ class Host(Frame): #inherit from Game?
         print("Client at", cn[1], "dropped")
         ship_index = self.connections.index(cn)
         ship = self.ships[ship_index]
+        ship.remove_dependants() #to deal with shields, exhaust, etc.  
         self.ships.remove(ship) #to fix the problem with the ships staying around after the connection dropped.  
         self.agents.remove(ship)
         cn[0].close()
@@ -143,7 +144,7 @@ class Host(Frame): #inherit from Game?
                 parts = data_list[i].split("|")
                 del parts[0]
 #                print("parts = ",parts)
-                ship = self.agents[i]
+                ship = self.ships[i] #was self.agents[i].  Not sure why that ever worked.  
                 for p in parts:
                     ship.set_property(p.split(":"))
         for cn in to_drop:

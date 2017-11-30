@@ -231,7 +231,8 @@ class Photon(MovingBody):
 
     def __init__(self,source,world):
         self.age  = 0
-        v0 = source.velocity + (source.get_heading() * self.INITIAL_SPEED)
+#        v0 = source.velocity + (source.get_heading() * self.INITIAL_SPEED)
+        v0 = (source.get_firing_vector() * self.INITIAL_SPEED)
         MovingBody.__init__(self, source.position, v0, world)
 
     def color(self):
@@ -253,23 +254,174 @@ class Photon(MovingBody):
     def get_type(self):
         return "Photon"
 
+class Missile(Photon):
+    LIFETIME = 160
+    ACCELERATION = 0.05 #twice Ship? A little bit more?  The same?  What's best?  
+    TURNS_IN_360   = 24
+    MAX_SPEED = 1.0
+    def __init__(self, source, world, t_pos):
+        Photon.__init__(self, source, world)
+        self.source = source
+        self.heading = source.get_heading()
+        self.velocity = source.velocity
+        self.target = self.get_lock(t_pos)
+        self.line = MissileTargetLine(self, self.target, self.world)
+        
+    def color(self):
+        return "#FF0000"
+    
+    def shape(self): #copied from Ship.shape()
+#        h  = self.heading
+#        hp = h.perp()
+#        p1 = self.position + h * 0.75
+#        p2 = self.position + hp * 0.25
+#        p3 = self.position - hp * 0.25
+#        return [p1,p2,p3]
+        d = 0.25
+        p1 = self.position + Vector2D( d, d) #movingbody; just a bit bigger.  
+        p2 = self.position + Vector2D(-d, d)        
+        p3 = self.position + Vector2D(-d,-d)        
+        p4 = self.position + Vector2D( d,-d)
+        return [p1,p2,p3,p4]
+        
+    
+    def update(self): #need to recalculate the 'lock' at each update
+#        if self.velocity.magnitude() > 0:
+#            self.heading = self.velocity.direction()
+        Photon.update(self)
+        self.heading = self.point()
+        
+    def leave(self): #overload to make an explosion on death?
+        Photon(self, self.world)
+        self.line.leave()
+        if not isinstance(self.target, Ship):
+            self.target.leave()
+        Photon.leave(self)
+        
+    def steer(self): #change later so it pursues a target - falling in behind it, then ramming.  
+        #should I make some sort of 'sticky' lock system, where it picks a target and then follows it unless it sees a much, much better one?  Would require storing the target on the missile.  
+        r_vec = self.heading * self.ACCELERATION
+#        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]
+#        lock = None
+#        lock_val = 0
+#        for pos in pos_locks:
+#            if lock != None: #this logic could probably be done better
+#                vec = pos.position-self.position
+#                val = vec.dot(self.heading) - vec.magnitude()/10
+#                if val > lock_val:
+#                    lock = pos
+#                    lock_val = val
+#                    r_vec = vec.direction() * self.ACCELERATION
+#                
+#            else:
+#                lock = pos
+#                vec = pos.position - self.position
+#                lock_val = vec.dot(self.heading) - vec.magnitude()/10 #10 is a magic number
+#                r_vec = vec.direction() * self.ACCELERATION
+            
+        return r_vec
+    
+    def point(self): #simplifying to work with a constant target
+#        r_vec = self.heading*1.0 #remember; must be a float!
+#        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]
+#        lock = None
+#        lock_val = 0
+#        for pos in pos_locks:
+#            if lock != None: #this logic could probably be done better
+#                vec = pos.position-self.position
+#                val = vec.direction().dot(self.heading) - vec.magnitude()/10
+#                if val > lock_val:
+#                    lock = pos
+#                    lock_val = val
+##                    r_vec = vec.direction() * self.ACCELERATION
+#                
+#            else:
+#                lock = pos
+#                vec = pos.position - self.position
+#                lock_val = vec.direction().dot(self.heading) - vec.magnitude()/10 #10 is a magic number
+##                r_vec = vec.direction() * self.ACCELERATION
+#        if lock != None:
+#            vec_to_lock = (lock.position-self.position).direction()
+#            rotate_by = self.heading.cross(vec_to_lock)
+#            r_vec = (self.heading + self.heading.perp()*rotate_by*1.4).direction() #*1.4 is a magic number
+        vec_to_lock = (self.target.position-self.position).direction()
+        rotate_by = self.heading.cross(vec_to_lock) * 0.1 #experimental number
+#        rotate_by = self.velocity.direction().cross(vec_to_lock) * 0.1 #will this help?  
+        r_vec = (self.heading + self.heading.perp()*rotate_by).direction()
+        return r_vec #make this smarter?  Maybe make the 'desired' heading be based on velocity?  
+    
+    def get_lock(self, t_pos):
+        lock = None
+        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]
+        for pos in pos_locks:
+            if lock != None:
+                if ((pos.position - t_pos).magnitude() < (lock.position - t_pos).magnitude()):
+                    lock = pos
+            else:
+                lock = pos
+        if lock == None:
+            lock = MovingBody(t_pos + Vector2D(), Vector2D(), self.world) #Build a special class for a missile locked onto space?  Or should it lock onto the cursor?  Or what?  
+        return lock                 
+    
+    def get_firing_vector(self): #Later, change this so it launches photons in a ring?  For an explosion?  Maybe drops their velocity?  
+        return self.heading
+    
+    def trim_physics(self): #from Ship
+        MovingBody.trim_physics(self)
+        m = self.velocity.magnitude()
+        if m > self.MAX_SPEED:
+            self.velocity = self.velocity * (self.MAX_SPEED / m)
+    
+class MissileTargetLine(MovingBody):
+    
+    def __init__(self, m, t, w):
+        self.missile = m
+        self.target = t
+        MovingBody.__init__(self, Point2D, Vector2D, w)
+        
+    def update(self):
+        pass
+    
+    def color(self):
+        return "#000080" #dark blue; change later?
+    
+    def shape(self):
+        vec = self.target.position - self.missile.position
+        h = vec.perp().direction()*0.03125
+        p1 = self.missile.position + h
+        p2 = self.missile.position - h
+        p3 = self.missile.position + vec - h
+        p4 = self.missile.position + vec + h
+        return [p1, p2, p3, p4]
+
 class Ship(MovingBody): #I have to find a way to update a ship's rotation
     TURNS_IN_360   = 24
     IMPULSE_FRAMES = 4
     ACCELERATION   = 0.05
     MAX_SPEED      = 2.0
+    RADIUS = 0.5 #for collision
+    FRAMES_TO_FIRE_MISSILE = 60 #one missile a second
+    MAX_HEALTH = 30
 
     def __init__(self,world):
         position0    = Point2D()
         velocity0    = Vector2D(0.0,0.0)
+        self.dependants = [] #to keep track of what to get rid of when the player drops
         MovingBody.__init__(self,position0,velocity0,world)
         self.speed   = 0.0
         self.angle   = 90.0
+        self.radius = Ship.RADIUS
         
         self.thrust = 0
         self.spin = 0
         self.firing_photons = False
         self.firing_missiles = False
+        exhaust = ShipExhaust(self)
+        self.firing_at = Point2D()
+        self.braking = False
+        
+        self.dependants.append(exhaust)
+        self.frames_till_missile = 0
 
     def color(self):
         return "#F0C080"
@@ -277,6 +429,9 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
     def get_heading(self):
         angle = self.angle * math.pi / 180.0
         return Vector2D(math.cos(angle), math.sin(angle))
+    
+    def get_firing_vector(self):
+        return (self.firing_at - self.position).direction()
         
     def turn(self):
         self.angle += 360.0 / self.TURNS_IN_360 * self.spin
@@ -285,23 +440,29 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         Photon(self, self.world)
 #        print("shots fired")
     
+    def launch_missile(self):
+        Missile(self, self.world, self.firing_at)
+        self.frames_till_missile = self.FRAMES_TO_FIRE_MISSILE
+    
     def shape(self):
-        h  = self.get_heading()
+        h  = self.get_heading() #trying to double the size, roughly.  Might have to push it a little backwards, too.  
         hp = h.perp()
-        p1 = self.position + h
-        p2 = self.position + hp * 0.5
-        p3 = self.position - hp * 0.5
+        p1 = self.position + h * 2.0
+        p2 = self.position + hp * 0.5 * 1.5
+        p3 = self.position - hp * 0.5 * 1.5
         return [p1,p2,p3]
 
     def steer(self):
-        return self.get_heading() * self.ACCELERATION * self.thrust
+        t_part = self.get_heading() * self.ACCELERATION * self.thrust
+        b_part = self.velocity.direction() * -1.0 * self.ACCELERATION * self.braking
+        return t_part + b_part
 
     def trim_physics(self):
         MovingBody.trim_physics(self)
         m = self.velocity.magnitude()
         if m > self.MAX_SPEED:
             self.velocity = self.velocity * (self.MAX_SPEED / m)
-            self.impulse = 0
+#            self.impulse = 0
             
     def set_property(self, pv): # pv is a property-value pair
         if pv[0] == "thrust":
@@ -319,6 +480,14 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         elif pv[0] == "firing_missiles":
             self.firing_missiles = (pv[1] == "True")
             
+        elif pv[0] == "firing_at":
+            xy = [float(i) for i in pv[1].split(",")]
+            self.firing_at = Point2D(xy[0], xy[1])
+            
+        elif pv[0] == "braking":
+            self.braking = float(pv[1])
+            
+            
             
     def update(self):
 #        print("updoot")
@@ -327,9 +496,48 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         if self.firing_photons:
 #            print("Check: photons")
             self.shoot()
+        if self.firing_missiles and (self.frames_till_missile == 0):
+            self.launch_missile()
+        if self.frames_till_missile > 0:
+            self.frames_till_missile -= 1
+#        if self.thrust > 0: #To try to give the ships an exhaust trail
+#            em = Ember(self.position, self.world)
+#            new_vel = -0.5 * em.velocity.magnitude() * self.get_heading() #the -0.5 instead of -1 is to make the trail not quie so long
+#            em.velocity = new_vel
+            #The embers are cool, but I think for now I'll try to keep the number of objects in the world lower.  When I'm doing latency tests, I'll see if the embers matter.  
+        targets = [a for a in self.world.agents if isinstance(a, Asteroid)]
+        for t in targets:
+            if self.is_hit_by(t):
+                t.explode()
             
+    def is_hit_by(self, asteroid): #a modification of the Shootable class' is_hit_by() method.  
+        return ((self.position - asteroid.position).magnitude()) < (asteroid.radius + self.radius)
+    
     def get_type(self):
         return "Ship"
+    
+    def remove_dependants(self):
+        for d in self.dependants:
+            d.leave() #more elegant than self.world.remove(d), I think, though it amounts to the same thing.  
+    
+class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers backwards?  
+    def __init__(self, ship): #This could cause problems when a player drops their connection and the ship is removed from the world.  edit: Turns out it does - I need to find a way to remove the exhaust.  Also, I need to deal with the weird input error I think I had.  
+        self.ship = ship #I got an error for not passing p0 or v0 to ShipExhaust.  I guess I'll include them.  
+        MovingBody.__init__(self, self.ship.position, Vector2D, self.ship.world)
+    def update(self): #Turns out the error above was that I had init__ instead of __init__
+        self.position = self.ship.position + Vector2D() #to hopefully copy the object
+    def shape(self):
+        if self.ship.thrust > 0:
+            h = -0.7*self.ship.get_heading() # the -1 is necessary; the 0.7 is arbitrary
+            hp = h.perp()
+            p1 = self.position + h
+            p2 = self.position + hp * 0.5
+            p3 = self.position - hp * 0.5
+            return [p1, p2, p3]
+        else:
+            return [self.position, self.position]
+    def color(self):
+        return "#EF6221" #A dull orange
 
 #class PlayAsteroids(Game):
 #
