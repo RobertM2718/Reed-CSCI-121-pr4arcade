@@ -20,6 +20,13 @@ TOP = 'wrapped' #should probably be 'wrapped'; 'bound' causes an error which fre
 #c.add(Game.Agent(Point2D(100, 100), c, "7AB")) #I got an error where many windows were opened.  What?  
 #error doesn't seem to be critical.  
 
+WORLD_WIDTH = 80
+WORLD_HEIGHT = 55#60
+SCREEN_WIDTH = 1067
+SCREEN_HEIGHT = 733#800
+
+# base: 60, 45, 800, 600
+
 while True:
     h_or_c = input("Host or Client?  ")
 #    if h_or_c == "host" or h_or_c == "Host":
@@ -54,7 +61,7 @@ while True:
                 continue #will this work?
             break
         print ("Initializing Host")
-        h = Host.Host("No", 60, 45, 800, 600, TOP, 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
+        h = Host.Host("No", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
         while not h.GAME_OVER:
             t_1 = time.time()
             h.update()
@@ -65,7 +72,7 @@ while True:
             time.sleep(max(to_wait, 0))
 #    elif h_or_c == "client" or h_or_c == "Client":
     elif h_or_c.lower() == "client":
-        c = Client.Client("Asteroids Arena", 60, 45, 800, 600, TOP, 0)
+        c = Client.Client("Asteroids Arena", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0)
         #???? There needs to be some way of verifying that a proper connection was formed.  
         #Note: there sort of is: I could use try/except with a ConnectionRefusedError.  Maybe a few other errors, too.  
 #        address = input("Host address?  Example: 'localhost'  ") #example may need to be changed

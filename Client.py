@@ -39,8 +39,8 @@ THRUST_KEY = 'w'
 BRAKE_KEY = 's' #is braking something I want to allow?
 LEFT_KEY = 'a'
 RIGHT_KEY = 'd'
-FIRE_KEY = ' '
-#QUIT_KEY = 'q'
+#FIRE_KEY = ' '
+QUIT_KEY = 'p'
 
 #with f as open("bindings.txt", 'r'):
 #    line = f.readline()
@@ -72,8 +72,10 @@ class Client(Frame):
         self.mouse_position = Point2D(0.0,0.0)
         self.mouse_down     = False
         self.bind_all('<Motion>',self.handle_mouse_motion)
-        self.canvas.bind('<Button-1>',self.handle_mouse_press)
-        self.canvas.bind('<ButtonRelease-1>',self.handle_mouse_release)
+        self.canvas.bind('<Button-1>',self.handle_left_mouse_press)
+        self.canvas.bind('<ButtonRelease-1>',self.handle_left_mouse_release)
+        self.canvas.bind('<Button-3>',self.handle_right_mouse_press)
+        self.canvas.bind('<ButtonRelease-3>',self.handle_right_mouse_release)
         self.bind_all('<KeyPress>', self.handle_keypress)
         self.bind_all('<KeyRelease>', self.handle_keyrelease)
         
@@ -222,20 +224,28 @@ class Client(Frame):
         self.report_strings["firing_at"] = str(self.mouse_position.x) + "," + str(self.mouse_position.y)
         #print("MOUSE MOVED",self.mouse_position,self.mouse_down)
 
-    def handle_mouse_press(self,event): #client
+    def handle_left_mouse_press(self,event): #client
         self.mouse_down = True
         self.report_strings["firing_photons"] = True
         self.handle_mouse_motion(event)
         #print("MOUSE CLICKED",self.mouse_down)
 
-    def handle_mouse_release(self,event): #client
+    def handle_left_mouse_release(self,event): #client
         self.mouse_down = False
         self.report_strings["firing_photons"] = False
         self.handle_mouse_motion(event)
         #print("MOUSE RELEASED",self.mouse_down)
+        
+    def handle_right_mouse_press(self, event):
+        self.report_strings["firing_missiles"] = True
+        self.handle_mouse_motion(event)
+        
+    def handle_right_mouse_release(self, event):
+        self.report_strings["firing_missiles"] = False
+        self.handle_mouse_motion(event)
 
     def handle_keypress(self,event): #both (so the host can quit)
-        Game.Game.handle_keypress(self, event)
+        #Game.Game.handle_keypress(self, event)
         
 #        self.thrusting = "0" # -1 -> braking, 0 -> neutral, 1 -> thrusting
 #        self.rotating = "0" # -1 -> left, 0 -> neutrual, 1 -> right
@@ -244,7 +254,11 @@ class Client(Frame):
 #        self.photon_cooldown = 0 #ticks till another photon can be launched
 #        self.firing_missiles = "False"
 #        self.
-        if event.char == THRUST_KEY:
+        
+        if event.char == QUIT_KEY:
+            self.GAME_OVER = True
+        
+        elif event.char == THRUST_KEY:
 #            if self.report_strings["thrust"] < 1: #This style might make things a little awkward.  
 #                self.report_strings["thrust"] += 1
             self.report_strings["thrust"] = 1
@@ -256,8 +270,8 @@ class Client(Frame):
                 self.report_strings["spin"] -= 1
 #        elif event.char == FIRE_KEY:
 #            self.report_strings["firing_photons"] = True
-        elif event.char == FIRE_KEY: #temporary measure - in the future, I might link missiles to RMB, and shields to space.  
-            self.report_strings["firing_missiles"] = True
+#        elif event.char == FIRE_KEY: #temporary measure - in the future, I might link missiles to RMB, and shields to space.  
+#            self.report_strings["firing_missiles"] = True
         elif event.char == BRAKE_KEY:
             self.report_strings["braking"] = 1
             
@@ -274,8 +288,8 @@ class Client(Frame):
                 self.report_strings["spin"] += 1
 #        elif event.char == FIRE_KEY:
 #            self.report_strings["firing_photons"] = False
-        elif event.char == FIRE_KEY:
-            self.report_strings["firing_missiles"] = False
+#        elif event.char == FIRE_KEY:
+#            self.report_strings["firing_missiles"] = False
         elif event.char == BRAKE_KEY:
             self.report_strings["braking"] = 0
         

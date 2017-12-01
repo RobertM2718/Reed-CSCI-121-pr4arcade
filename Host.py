@@ -81,6 +81,10 @@ class Host(Frame): #inherit from Game?
             connections_formed += 1
         self.address = server_address
         
+        if len(self.ships) > 1:
+            center = Point2D(w/2, h/2)
+            
+        
     def add_connection(self, cn):  
         self.connections.append(cn)
         ship = PlayAsteroids.Ship(self)

@@ -7,6 +7,13 @@ import random
 
 TIME_STEP = 0.5
 
+def collide(a, b): #This isn't exactly object-oriented, but I still want it here.  
+    if (a.position - b.position).magnitude() < a.radius + b.radius:
+        a_dam = b.COLLISION_DAMAGE
+        b_dam = a.COLLISION_DAMAGE
+        a.damage(a_dam)
+        b.damage(b_dam)
+
 class MovingBody(Agent):
 
     def __init__(self, p0, v0, world):
@@ -61,13 +68,21 @@ class Shootable(MovingBody):
     SHRAPNEL_CLASS  = None
     SHRAPNEL_PIECES = 0
     WORTH           = 1
+    COLLISION_DAMAGE = 3
+    STARTING_HEALTH = 1
 
     def __init__(self, position0, velocity0, radius, world):
         self.radius = radius
         MovingBody.__init__(self, position0, velocity0, world)
+        self.health = self.STARTING_HEALTH
 
-    def is_hit_by(self, photon):
-        return ((self.position - photon.position).magnitude() < self.radius)
+#    def is_hit_by(self, photon):
+#        return ((self.position - photon.position).magnitude() < self.radius)
+
+    def damage(self, n):
+        self.health -= n
+        if self.health < 1:
+            self.explode()
 
     def explode(self):
         self.world.score += self.WORTH
@@ -85,6 +100,7 @@ class Asteroid(Shootable):
     MIN_SPEED = 0.1
     MAX_SPEED = 0.3
     SIZE      = 3.0
+    STARTING_HEALTH = 3 #?
 
     def __init__(self, position0, velocity0, world):
         Shootable.__init__(self,position0, velocity0, self.SIZE, world)
@@ -228,12 +244,26 @@ class LargeAsteroid(ParentAsteroid):
 class Photon(MovingBody):
     INITIAL_SPEED = 2.0 * SmallAsteroid.MAX_SPEED
     LIFETIME      = 40
+    COLLISION_DAMAGE = 1
+    STARTING_HEALTH = 1
+    RADIUS = 0.125
 
     def __init__(self,source,world):
         self.age  = 0
 #        v0 = source.velocity + (source.get_heading() * self.INITIAL_SPEED)
         v0 = (source.get_firing_vector() * self.INITIAL_SPEED)
+        self.health = self.STARTING_HEALTH
+        self.radius = self.RADIUS
+        self.source = source
         MovingBody.__init__(self, source.position, v0, world)
+        self.left = False
+        
+    def damage(self, n):
+        self.health -= n
+        if self.health < 1 and not self.left: #again, 'x not in list' issue
+            self.left = True
+            Flash(self.position, self.world, 0.5, 2)
+            self.leave()
 
     def color(self):
         return "#8080FF"
@@ -241,29 +271,27 @@ class Photon(MovingBody):
     def update(self):
         MovingBody.update(self)
         self.age += 1
-        if self.age >= self.LIFETIME:
-            self.leave()
+        if self.age >= self.LIFETIME and not self.left: #to try to avoid the 'x not in list' issue
+            self.leave() 
         else:
-            targets = [a for a in self.world.agents if isinstance(a,Shootable)]
+            targets = [a for a in self.world.agents if isinstance(a,Shootable) or (isinstance(a, Missile) and (self.source != a.source))] #should this happen?  
             for t in targets:
-                if t.is_hit_by(self):
-                    t.explode()
-                    self.leave()
-                    return
+                collide(self, t)
                 
     def get_type(self):
         return "Photon"
 
 class Missile(Photon):
-    LIFETIME = 160
-    ACCELERATION = 0.05 #twice Ship? A little bit more?  The same?  What's best?  
-    TURNS_IN_360   = 24
-    MAX_SPEED = 1.0
+    LIFETIME = Photon.LIFETIME * 10
+    ACCELERATION = 0.5 #twice Ship? A little bit more?  The same?  What's best?  
+#    TURNS_IN_360   = 24
+#    MAX__REL_SPEED = 0.001
+    RADIUS = 0.25
+    STARTING_HEALTH = 3
     def __init__(self, source, world, t_pos):
         Photon.__init__(self, source, world)
-        self.source = source
         self.heading = source.get_heading()
-        self.velocity = source.velocity
+        self.velocity = source.velocity + source.get_heading()*self.INITIAL_SPEED*0.5
         self.target = self.get_lock(t_pos)
         self.line = MissileTargetLine(self, self.target, self.world)
         
@@ -292,7 +320,7 @@ class Missile(Photon):
         self.heading = self.point()
         
     def leave(self): #overload to make an explosion on death?
-        Photon(self, self.world)
+        Flare(self.position, self.world, 3, 3) #lifetime was 2
         self.line.leave()
         if not isinstance(self.target, Ship):
             self.target.leave()
@@ -300,7 +328,17 @@ class Missile(Photon):
         
     def steer(self): #change later so it pursues a target - falling in behind it, then ramming.  
         #should I make some sort of 'sticky' lock system, where it picks a target and then follows it unless it sees a much, much better one?  Would require storing the target on the missile.  
-        r_vec = self.heading * self.ACCELERATION
+        
+        #This one works
+#        thrust = self.heading * self.ACCELERATION
+#        match = (self.target.velocity - self.velocity).direction()*self.ACCELERATION*0.5
+#        r_vec = thrust + match
+        
+        #This one might be better
+        to_target = self.point()
+        rel_vel = (self.velocity - self.target.velocity).direction()
+        r_vec = (to_target - rel_vel).direction()*self.ACCELERATION
+        
 #        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]
 #        lock = None
 #        lock_val = 0
@@ -344,11 +382,12 @@ class Missile(Photon):
 #            vec_to_lock = (lock.position-self.position).direction()
 #            rotate_by = self.heading.cross(vec_to_lock)
 #            r_vec = (self.heading + self.heading.perp()*rotate_by*1.4).direction() #*1.4 is a magic number
-        vec_to_lock = (self.target.position-self.position).direction()
-        rotate_by = self.heading.cross(vec_to_lock) * 0.1 #experimental number
-#        rotate_by = self.velocity.direction().cross(vec_to_lock) * 0.1 #will this help?  
-        r_vec = (self.heading + self.heading.perp()*rotate_by).direction()
-        return r_vec #make this smarter?  Maybe make the 'desired' heading be based on velocity?  
+#        vec_to_lock = (self.target.position-self.position).direction()
+#        rotate_by = self.heading.cross(vec_to_lock) * 0.5 #experimental number
+##        rotate_by = self.velocity.direction().cross(vec_to_lock) * 0.1 #will this help?  Not at all.  
+#        r_vec = (self.heading + self.heading.perp()*rotate_by).direction()
+#        return r_vec #make this smarter?  Maybe make the 'desired' heading be based on velocity?  
+        return (self.target.position-self.position).direction()
     
     def get_lock(self, t_pos):
         lock = None
@@ -358,7 +397,8 @@ class Missile(Photon):
                 if ((pos.position - t_pos).magnitude() < (lock.position - t_pos).magnitude()):
                     lock = pos
             else:
-                lock = pos
+                if (pos.position - t_pos).magnitude() < 5:
+                    lock = pos
         if lock == None:
             lock = MovingBody(t_pos + Vector2D(), Vector2D(), self.world) #Build a special class for a missile locked onto space?  Or should it lock onto the cursor?  Or what?  
         return lock                 
@@ -366,18 +406,65 @@ class Missile(Photon):
     def get_firing_vector(self): #Later, change this so it launches photons in a ring?  For an explosion?  Maybe drops their velocity?  
         return self.heading
     
-    def trim_physics(self): #from Ship
-        MovingBody.trim_physics(self)
-        m = self.velocity.magnitude()
-        if m > self.MAX_SPEED:
-            self.velocity = self.velocity * (self.MAX_SPEED / m)
+#    def trim_physics(self): #from Ship
+#        MovingBody.trim_physics(self)
+
+#        match = (self.target.velocity - self.velocity)
+#        rel_speed = match.magnitude()
+        
+#        m = self.velocity.magnitude()
+#        if m > self.MAX_SPEED:
+#            self.velocity = self.velocity * (self.MAX_SPEED / m)
+#        if True:#rel_speed > self.MAX_REL_SPEED:
+#            self.velocity = (self.velocity + match*1.0) #brake?
     
+class Flare(MovingBody):
+    COLLISION_DAMAGE = 3
+    def __init__(self, p0, world, radius, lifetime):
+        MovingBody.__init__(self, p0, Vector2D(), world)
+        self.radius = radius
+        self.lifetime = lifetime
+        self.has_existed = 0
+    def update(self):
+        #MovingBody.update(self) I probably don't need this.  
+        targets = [a for a in self.world.agents if isinstance(a, Asteroid) or isinstance(a, Ship) or isinstance(a, Missile)]
+        for t in targets:
+            collide(self, t)
+        self.has_existed += 1
+        if self.has_existed >= self.lifetime:
+            self.leave()
+            
+    def damage(self, n):
+        pass
+        
+    def shape(self):
+        points = []
+        to_make = 20
+        made = 0
+        while made < to_make:
+            angle = (360*made/to_make) * math.pi / 180.0
+            vec = Vector2D(math.cos(angle), math.sin(angle))
+            points.append(self.position + vec*float(self.radius))
+            made += 1
+        return points
+        
+    def color(self):
+        return "#FFFFFF"
+    
+class Flash(Flare): #Like Flare, but does no damage, and does not collide.  A graphics experiment.  
+    COLLISION_DAMAGE = 0
+    
+    def update(self):
+        self.has_existed += 1
+        if self.has_existed >= self.lifetime:
+            self.leave()
+
 class MissileTargetLine(MovingBody):
     
     def __init__(self, m, t, w):
         self.missile = m
         self.target = t
-        MovingBody.__init__(self, Point2D, Vector2D, w)
+        MovingBody.__init__(self, Point2D(), Vector2D(), w)
         
     def update(self):
         pass
@@ -399,9 +486,13 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
     IMPULSE_FRAMES = 4
     ACCELERATION   = 0.05
     MAX_SPEED      = 2.0
-    RADIUS = 0.5 #for collision
+    RADIUS = 1.0 #for collision
     FRAMES_TO_FIRE_MISSILE = 60 #one missile a second
-    MAX_HEALTH = 30
+    STARTING_HEALTH = 30
+    COLLISION_DAMAGE = 3
+    MAX_ENERGY = 450#600
+    PHOTON_COST = 15#20
+    STARTING_MISSILES = 3
 
     def __init__(self,world):
         position0    = Point2D()
@@ -411,6 +502,9 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         self.speed   = 0.0
         self.angle   = 90.0
         self.radius = Ship.RADIUS
+        self.health = self.STARTING_HEALTH
+        self.energy = self.MAX_ENERGY
+        self.missiles = self.STARTING_MISSILES
         
         self.thrust = 0
         self.spin = 0
@@ -422,9 +516,17 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         
         self.dependants.append(exhaust)
         self.frames_till_missile = 0
+        
+        #for when wrecked:
+        self.wrecked = False
+        self.spark_frames = 20
+        self.since_spark = 30 #so the first spark isn't coming out during the initial burst
 
     def color(self):
-        return "#F0C080"
+        if self.wrecked:
+            return "#626A77" #greyish
+        else:
+            return "#F0C080"
 
     def get_heading(self):
         angle = self.angle * math.pi / 180.0
@@ -437,28 +539,38 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         self.angle += 360.0 / self.TURNS_IN_360 * self.spin
 
     def shoot(self):
-        Photon(self, self.world)
+        if self.energy >= self.PHOTON_COST:
+            Photon(self, self.world)
+            self.energy -= self.PHOTON_COST
 #        print("shots fired")
     
     def launch_missile(self):
-        Missile(self, self.world, self.firing_at)
-        self.frames_till_missile = self.FRAMES_TO_FIRE_MISSILE
+        if self.missiles > 0:
+            Missile(self, self.world, self.firing_at)
+            self.frames_till_missile = self.FRAMES_TO_FIRE_MISSILE
+            self.missiles -= 1
     
     def shape(self):
         h  = self.get_heading() #trying to double the size, roughly.  Might have to push it a little backwards, too.  
-        hp = h.perp()
-        p1 = self.position + h * 2.0
-        p2 = self.position + hp * 0.5 * 1.5
-        p3 = self.position - hp * 0.5 * 1.5
+        
+        hp = h.perp() #instead of self.position, how about self.back()
+        b = self.back()
+        p1 = b + h * 2.0
+        p2 = b + hp * 0.5 * 1.5
+        p3 = b - hp * 0.5 * 1.5
         return [p1,p2,p3]
 
     def steer(self):
-        t_part = self.get_heading() * self.ACCELERATION * self.thrust
-        b_part = self.velocity.direction() * -1.0 * self.ACCELERATION * self.braking
-        return t_part + b_part
+        if not self.wrecked:
+            t_part = self.get_heading() * self.ACCELERATION * self.thrust
+            b_part = self.velocity.direction() * -1.0 * self.ACCELERATION * self.braking
+            return t_part + b_part
+        else:
+            return Vector2D()
+
 
     def trim_physics(self):
-        MovingBody.trim_physics(self)
+#        MovingBody.trim_physics(self) #I'm pretty sure that trim_physics() never gets called, and also that MovingBody doesn't HAVE a trim_physics()
         m = self.velocity.magnitude()
         if m > self.MAX_SPEED:
             self.velocity = self.velocity * (self.MAX_SPEED / m)
@@ -492,42 +604,68 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
     def update(self):
 #        print("updoot")
         MovingBody.update(self)
-        self.turn()
-        if self.firing_photons:
-#            print("Check: photons")
-            self.shoot()
-        if self.firing_missiles and (self.frames_till_missile == 0):
-            self.launch_missile()
-        if self.frames_till_missile > 0:
-            self.frames_till_missile -= 1
+        if not self.wrecked:
+            self.turn()
+            if self.firing_photons:
+    #            print("Check: photons")
+                self.shoot()
+            if self.firing_missiles and (self.frames_till_missile == 0):
+                self.launch_missile()
+            if self.frames_till_missile > 0:
+                self.frames_till_missile -= 1
+        else:
+            if self.since_spark <= 0:
+                Ember(self.position, self.world)
+                self.since_spark = self.spark_frames
+            self.since_spark -= 1
+            
+        if self.energy < self.MAX_ENERGY:
+            self.energy += 1 #should I make it so that energy is only ever an int?  
 #        if self.thrust > 0: #To try to give the ships an exhaust trail
 #            em = Ember(self.position, self.world)
 #            new_vel = -0.5 * em.velocity.magnitude() * self.get_heading() #the -0.5 instead of -1 is to make the trail not quie so long
 #            em.velocity = new_vel
             #The embers are cool, but I think for now I'll try to keep the number of objects in the world lower.  When I'm doing latency tests, I'll see if the embers matter.  
-        targets = [a for a in self.world.agents if isinstance(a, Asteroid)]
+        targets = [a for a in self.world.agents if isinstance(a, Asteroid) or (isinstance(a, Photon) and a.source != self)]
         for t in targets:
-            if self.is_hit_by(t):
-                t.explode()
+            collide(self, t)
+        self.trim_physics() #Should this happen?  Does this improve gameplay? 
             
-    def is_hit_by(self, asteroid): #a modification of the Shootable class' is_hit_by() method.  
-        return ((self.position - asteroid.position).magnitude()) < (asteroid.radius + self.radius)
+    def damage(self, n):
+        self.health -= n
+        if self.health < 1:
+            self.wreck()
+            
+    def wreck(self):
+        if not self.wrecked:
+            self.wrecked = True
+            for _ in range(10):
+                Ember(self.position, self.world)
+            Flare(self.position, self.world, 5, 3)
+        
+#    def is_hit_by(self, asteroid): #a modification of the Shootable class' is_hit_by() method.  
+#        return ((self.position - asteroid.position).magnitude()) < (asteroid.radius + self.radius)
     
-    def get_type(self):
-        return "Ship"
+#    def get_type(self):
+#        return "Ship"
     
     def remove_dependants(self):
         for d in self.dependants:
             d.leave() #more elegant than self.world.remove(d), I think, though it amounts to the same thing.  
+    
+    def back(self):
+        return self.position-self.get_heading()*0.5 #arbitrary constant
+    
     
 class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers backwards?  
     def __init__(self, ship): #This could cause problems when a player drops their connection and the ship is removed from the world.  edit: Turns out it does - I need to find a way to remove the exhaust.  Also, I need to deal with the weird input error I think I had.  
         self.ship = ship #I got an error for not passing p0 or v0 to ShipExhaust.  I guess I'll include them.  
         MovingBody.__init__(self, self.ship.position, Vector2D, self.ship.world)
     def update(self): #Turns out the error above was that I had init__ instead of __init__
-        self.position = self.ship.position + Vector2D() #to hopefully copy the object
+#        self.position = self.ship.position + Vector2D() #to hopefully copy the object
+        self.position = self.ship.back()
     def shape(self):
-        if self.ship.thrust > 0:
+        if self.ship.thrust > 0 and not self.ship.wrecked:
             h = -0.7*self.ship.get_heading() # the -1 is necessary; the 0.7 is arbitrary
             hp = h.perp()
             p1 = self.position + h
@@ -538,6 +676,13 @@ class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers
             return [self.position, self.position]
     def color(self):
         return "#EF6221" #A dull orange
+    
+class EnergyIndicator(Flash):
+    def update(self):
+        self.position = self.ship.position + Vector2D()
+        
+    def color(self):
+        return "FFFFFF" #Change later to be based on ship.energy
 
 #class PlayAsteroids(Game):
 #
