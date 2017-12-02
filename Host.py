@@ -164,6 +164,8 @@ class Host(Frame): #inherit from Game?
             self.before_start_ticks -= 1
         else:
             self.started = True
+            for s in self.ships:
+                s.toggle_weapons()
             
         
         if self.started:

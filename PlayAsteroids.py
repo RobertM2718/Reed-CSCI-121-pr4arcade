@@ -505,6 +505,7 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         self.health = self.STARTING_HEALTH
         self.energy = self.MAX_ENERGY
         self.missiles = self.STARTING_MISSILES
+        self.weapons_on = False
         
         self.thrust = 0
         self.spin = 0
@@ -539,13 +540,13 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         self.angle += 360.0 / self.TURNS_IN_360 * self.spin
 
     def shoot(self):
-        if self.energy >= self.PHOTON_COST:
+        if self.energy >= self.PHOTON_COST and self.weapons_on:
             Photon(self, self.world)
             self.energy -= self.PHOTON_COST
 #        print("shots fired")
     
     def launch_missile(self):
-        if self.missiles > 0:
+        if self.missiles > 0 and self.weapons_on:
             Missile(self, self.world, self.firing_at)
             self.frames_till_missile = self.FRAMES_TO_FIRE_MISSILE
             self.missiles -= 1
@@ -655,6 +656,9 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
     
     def back(self):
         return self.position-self.get_heading()*0.5 #arbitrary constant
+    
+    def toggle_weapons(self):
+        self.weapons_on = not self.weapons_on
     
     
 class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers backwards?  
