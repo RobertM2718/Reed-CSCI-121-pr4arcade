@@ -104,10 +104,11 @@ class Asteroid(Shootable):
 
     def __init__(self, position0, velocity0, world):
         Shootable.__init__(self,position0, velocity0, self.SIZE, world)
+        self.world = world
         self.make_shape()
 
     def choose_velocity(self):
-        return Vector2D.random() * random.uniform(self.MIN_SPEED,self.MAX_SPEED) 
+        return Vector2D.random() * random.uniform(self.MIN_SPEED,self.MAX_SPEED) * (60.0/self.world.FPS)
         
     def make_shape(self):
         angle = 0.0
@@ -133,6 +134,7 @@ class Asteroid(Shootable):
 
 class ParentAsteroid(Asteroid):
     def __init__(self,world):
+        self.world = world
         world.number_of_asteroids += 1
         velocity0 = self.choose_velocity()
         position0 = world.bounds.point_at(random.random(),random.random())
@@ -160,11 +162,18 @@ class ParentAsteroid(Asteroid):
         return "ParentAsteroid"
 
 class Ember(MovingBody):
-    INITIAL_SPEED = 2.0
-    SLOWDOWN      = 0.2
-    TOO_SLOW      = INITIAL_SPEED / 20.0
+#    INITIAL_SPEED = 2.0
+    START_SPEED = 2.0
+#    SLOWDOWN      = 0.2
+    SlOW_DOWN_BY = 0.2
+#    TOO_SLOW      = INITIAL_SPEED / 20.0
+    
 
     def __init__(self, position0, world):
+        self.INITIAL_SPEED = self.START_SPEED * (60.0/world.FPS)
+        self.TOO_SLOW = self.INITIAL_SPEED / 20.0
+        self.SLOW_DOWN_BY = 0.2
+        self.SLOWDOWN = self.SLOW_DOWN_BY * (60.0/world.FPS) #weird issues
         velocity0 = Vector2D.random() * self.INITIAL_SPEED
         MovingBody.__init__(self, position0, velocity0, world)
 
@@ -192,6 +201,7 @@ class Ember(MovingBody):
 
 class ShrapnelAsteroid(Asteroid):
     def __init__(self, position0, world):
+        self.world = world
         world.number_of_shrapnel += 1
         velocity0 = self.choose_velocity()
         Asteroid.__init__(self, position0, velocity0, world)
@@ -251,7 +261,7 @@ class Photon(MovingBody):
     def __init__(self,source,world):
         self.age  = 0
 #        v0 = source.velocity + (source.get_heading() * self.INITIAL_SPEED)
-        v0 = (source.get_firing_vector() * self.INITIAL_SPEED)
+        v0 = (source.get_firing_vector() * self.INITIAL_SPEED)*(60.0/world.FPS)
         self.health = self.STARTING_HEALTH
         self.radius = self.RADIUS
         self.source = source
@@ -262,7 +272,7 @@ class Photon(MovingBody):
         self.health -= n
         if self.health < 1 and not self.left: #again, 'x not in list' issue
             self.left = True
-            Flash(self.position, self.world, 0.5, 2)
+            Flash(self.position, self.world, 0.5, 4)
             self.leave()
 
     def color(self):
@@ -270,7 +280,7 @@ class Photon(MovingBody):
 
     def update(self):
         MovingBody.update(self)
-        self.age += 1
+        self.age += (60.0/self.world.FPS)
         if self.age >= self.LIFETIME and not self.left: #to try to avoid the 'x not in list' issue
             self.leave() 
         else:
@@ -283,15 +293,16 @@ class Photon(MovingBody):
 
 class Missile(Photon):
     LIFETIME = Photon.LIFETIME * 10
-    ACCELERATION = 0.5 #twice Ship? A little bit more?  The same?  What's best?  
+    ACCEL = 0.5 #twice Ship? A little bit more?  The same?  What's best?  
 #    TURNS_IN_360   = 24
 #    MAX__REL_SPEED = 0.001
     RADIUS = 0.25
     STARTING_HEALTH = 3
     def __init__(self, source, world, t_pos):
         Photon.__init__(self, source, world)
+        self.ACCELERATION = self.ACCEL * (60.0/self.world.FPS)
         self.heading = source.get_heading()
-        self.velocity = source.velocity + source.get_heading()*self.INITIAL_SPEED*0.5
+        self.velocity = source.velocity + source.get_heading()*self.INITIAL_SPEED*0.5 #don't need world.FPS here, because it incorporates a velocity already.  
         self.target = self.get_lock(t_pos)
         self.line = MissileTargetLine(self, self.target, self.world)
         
@@ -320,7 +331,7 @@ class Missile(Photon):
         self.heading = self.point()
         
     def leave(self): #overload to make an explosion on death?
-        Flare(self.position, self.world, 3, 3) #lifetime was 2
+        Flare(self.position, self.world, 3, 4) #lifetime was 2
         self.line.leave()
         if not isinstance(self.target, Ship):
             self.target.leave()
@@ -420,8 +431,10 @@ class Missile(Photon):
     
 class Flare(MovingBody):
     COLLISION_DAMAGE = 3
+    
     def __init__(self, p0, world, radius, lifetime):
         MovingBody.__init__(self, p0, Vector2D(), world)
+        self.COLLISION_DAMAGE = Flare.COLLISION_DAMAGE * (60.0/self.world.FPS)
         self.radius = radius
         self.lifetime = lifetime
         self.has_existed = 0
@@ -430,7 +443,7 @@ class Flare(MovingBody):
         targets = [a for a in self.world.agents if isinstance(a, Asteroid) or isinstance(a, Ship) or isinstance(a, Missile)]
         for t in targets:
             collide(self, t)
-        self.has_existed += 1
+        self.has_existed += (60.0/self.world.FPS)
         if self.has_existed >= self.lifetime:
             self.leave()
             
@@ -455,7 +468,7 @@ class Flash(Flare): #Like Flare, but does no damage, and does not collide.  A gr
     COLLISION_DAMAGE = 0
     
     def update(self):
-        self.has_existed += 1
+        self.has_existed += (60.0/self.world.FPS)
         if self.has_existed >= self.lifetime:
             self.leave()
 
@@ -495,6 +508,12 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
     STARTING_MISSILES = 3
 
     def __init__(self,world):
+        self.TURNS_IN_360 = Ship.TURNS_IN_360*(60.0/world.FPS)
+        self.ACCELERATION = Ship.ACCELERATION*(60.0/world.FPS)
+        self.MAX_SPEED = Ship.MAX_SPEED*(60.0/world.FPS)
+        self.FRAMES_TO_FIRE_MISSILE = Ship.FRAMES_TO_FIRE_MISSILE*world.FPS/60.0
+        
+        
         position0    = Point2D()
         velocity0    = Vector2D(0.0,0.0)
         self.dependants = [] #to keep track of what to get rid of when the player drops
@@ -621,7 +640,7 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
             self.since_spark -= 1
             
         if self.energy < self.MAX_ENERGY:
-            self.energy += 1 #should I make it so that energy is only ever an int?  
+            self.energy += (60.0/self.world.FPS) #should I make it so that energy is only ever an int?  
 #        if self.thrust > 0: #To try to give the ships an exhaust trail
 #            em = Ember(self.position, self.world)
 #            new_vel = -0.5 * em.velocity.magnitude() * self.get_heading() #the -0.5 instead of -1 is to make the trail not quie so long

@@ -33,7 +33,7 @@ class Host(Frame): #inherit from Game?
     MAX_ASTEROIDS    = 6
     INTRODUCE_CHANCE = 0.01
     #server_address = ("localhost", 10000)
-    def __init__(self, name, w, h, ww, wh, topology = 'wrapped', console_lines = 0, port = 10000, num_cns = 1): #need to add options so running Main lets you choose your port.  
+    def __init__(self, name, w, h, ww, wh, topology = 'wrapped', console_lines = 0, port = 10000, num_cns = 1, FPS = 60): #need to add options so running Main lets you choose your port.  
         
         #stuff I need (from Frame) but don't want.  Remove?
         
@@ -56,6 +56,7 @@ class Host(Frame): #inherit from Game?
         
         self.before_start_ticks = self.DELAY_START
         self.started = False
+        self.FPS = FPS
         
         self.command_string = ""
         
@@ -161,7 +162,7 @@ class Host(Frame): #inherit from Game?
         self.command_string = "" #first 'command' will be null?  Shouldn't matter.  
         #                           Turns out it does, but I can resolve that in Client.  
         if self.before_start_ticks > 0:
-            self.before_start_ticks -= 1
+            self.before_start_ticks -= 60/self.FPS
         else:
             self.started = True
             for s in self.ships:

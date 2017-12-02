@@ -24,6 +24,7 @@ WORLD_WIDTH = 80
 WORLD_HEIGHT = 55#60
 SCREEN_WIDTH = 1067
 SCREEN_HEIGHT = 733#800
+FPS = 60.0
 
 # base: 60, 45, 800, 600
 
@@ -61,18 +62,18 @@ while True:
                 continue #will this work?
             break
         print ("Initializing Host")
-        h = Host.Host("No", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0, port, num_cns) #I think the issue I was having was leaving out console_lines(the 0)
+        h = Host.Host("No", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0, port, num_cns, FPS) #I think the issue I was having was leaving out console_lines(the 0)
         while not h.GAME_OVER:
             t_1 = time.time()
             h.update()
             t_2 = time.time()
-            to_wait = (1.0/60 - (t_2 - t_1))
+            to_wait = (1.0/FPS - (t_2 - t_1))
 #            if to_wait > 0:
 #                print("waited")
             time.sleep(max(to_wait, 0))
 #    elif h_or_c == "client" or h_or_c == "Client":
     elif h_or_c.lower() == "client":
-        c = Client.Client("Asteroids Arena", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0)
+        c = Client.Client("Asteroids Arena", WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, TOP, 0, FPS)
         #???? There needs to be some way of verifying that a proper connection was formed.  
         #Note: there sort of is: I could use try/except with a ConnectionRefusedError.  Maybe a few other errors, too.  
 #        address = input("Host address?  Example: 'localhost'  ") #example may need to be changed

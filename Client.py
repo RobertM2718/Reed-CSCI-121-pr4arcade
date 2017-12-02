@@ -49,7 +49,7 @@ QUIT_KEY = 'p'
 
 class Client(Frame):
     
-    def __init__(self, name, w, h, ww, wh, topology = 'wrapped', console_lines = 0):
+    def __init__(self, name, w, h, ww, wh, topology = 'wrapped', console_lines = 0, FPS = 60):
 
         # Register the world coordinate and graphics parameters.
         self.WINDOW_WIDTH = ww
