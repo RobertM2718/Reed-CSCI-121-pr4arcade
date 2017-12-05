@@ -193,11 +193,12 @@ class Host(Frame): #inherit from Game?
         
         
     def pass_output(self):
-        cmds = self.command_string.encode('ascii')
-        len_data = str(len(cmds))
-        to_send = ("0"*(16-len(len_data)) + len_data).encode('ascii') + cmds
-        for c in self.connections:
-            c[0].sendall(to_send)
+        markers = [s.player_marker() for s in self.ships] if len(self.ships) > 1 else ["" for s in self.ships]
+        for i in range(len(self.connections)):
+            cmds = (markers[i] + self.command_string).encode('ascii') #is this wasteful?
+            len_data = str(len(cmds))
+            to_send = ("0"*(16-len(len_data)) + len_data).encode('ascii') + cmds
+            self.connections[i][0].sendall(to_send)
     
     def add(self, agent):
         self.agents.append(agent)

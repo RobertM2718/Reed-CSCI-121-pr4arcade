@@ -292,15 +292,17 @@ class Photon(MovingBody):
         return "Photon"
 
 class Missile(Photon):
+    MAX_SPEED = 2.0
     LIFETIME = Photon.LIFETIME * 10
-    ACCEL = 0.5 #twice Ship? A little bit more?  The same?  What's best?  
+    ACCEL = 0.1 #twice Ship? A little bit more?  The same?  What's best?  
 #    TURNS_IN_360   = 24
 #    MAX__REL_SPEED = 0.001
     RADIUS = 0.25
-    STARTING_HEALTH = 3
+    STARTING_HEALTH = 2 #was 3, but missiles were hard to shoot down.  
     def __init__(self, source, world, t_pos):
         Photon.__init__(self, source, world)
         self.ACCELERATION = self.ACCEL * (60.0/self.world.FPS)
+        self.MAX_SPEED = Missile.MAX_SPEED*(60.0/self.world.FPS)
         self.heading = source.get_heading()
         self.velocity = source.velocity + source.get_heading()*self.INITIAL_SPEED*0.5 #don't need world.FPS here, because it incorporates a velocity already.  
         self.target = self.get_lock(t_pos)
@@ -330,6 +332,11 @@ class Missile(Photon):
         Photon.update(self)
         self.heading = self.point()
         
+    def trim_physics(self):
+        m = self.velocity.magnitude()
+        if m > self.MAX_SPEED:
+            self.velocity = self.velocity * (self.MAX_SPEED / m)
+        
     def leave(self): #overload to make an explosion on death?
         Flare(self.position, self.world, 3, 4) #lifetime was 2
         self.line.leave()
@@ -346,8 +353,10 @@ class Missile(Photon):
 #        r_vec = thrust + match
         
         #This one might be better
-        to_target = self.point()
-        rel_vel = (self.velocity - self.target.velocity).direction()
+#        to_target = self.point()
+        to_target = (self.target.position-self.position)
+#        rel_vel = (self.velocity - self.target.velocity).direction()
+        rel_vel = (self.velocity-self.target.velocity)
         r_vec = (to_target - rel_vel).direction()*self.ACCELERATION
         
 #        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]
@@ -546,7 +555,7 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         if self.wrecked:
             return "#626A77" #greyish
         else:
-            return "#F0C080"
+            return "#F0C080" 
 
     def get_heading(self):
         angle = self.angle * math.pi / 180.0
@@ -556,7 +565,7 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         return (self.firing_at - self.position).direction()
         
     def turn(self):
-        self.angle += 360.0 / self.TURNS_IN_360 * self.spin
+        self.angle += 360.0 / self.TURNS_IN_360 * self.spin * 60/self.world.FPS
 
     def shoot(self):
         if self.energy >= self.PHOTON_COST and self.weapons_on:
@@ -674,10 +683,25 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
             d.leave() #more elegant than self.world.remove(d), I think, though it amounts to the same thing.  
     
     def back(self):
-        return self.position-self.get_heading()*0.5 #arbitrary constant
+        return self.position-self.get_heading()*0.5 #arbitrary constant; pushes the shape of the ship back from its center of collision
     
     def toggle_weapons(self):
         self.weapons_on = not self.weapons_on
+        
+    def player_marker(self): #builds the whole command string to draw the player-marking shape
+        points = self.shape()
+        
+        r_points_1 = [p + ((p-self.position).direction() * 0.4) for p in points]
+        r_points_2 = [p + ((p-self.position).direction() * 0.2) for p in points]
+        color_1 = "#47C421" #bright green
+        color_2 = "#000000" #black
+        r_str = "|" + color_1
+        for p in r_points_1:
+            r_str += ":" + str(round(p.x, 4)) + "," + str(round(p.y, 4))
+        r_str += "|" + color_2
+        for p in r_points_2:
+            r_str += ":" + str(round(p.x, 4)) + "," + str(round(p.y, 4))
+        return r_str
     
     
 class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers backwards?  
