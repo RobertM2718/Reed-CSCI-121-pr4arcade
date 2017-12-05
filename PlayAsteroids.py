@@ -353,10 +353,10 @@ class Missile(Photon):
 #        r_vec = thrust + match
         
         #This one might be better
-#        to_target = self.point()
-        to_target = (self.target.position-self.position)
-#        rel_vel = (self.velocity - self.target.velocity).direction()
-        rel_vel = (self.velocity-self.target.velocity)
+        to_target = self.point()
+#        to_target = (self.target.position-self.position)
+        rel_vel = (self.velocity - self.target.velocity).direction()
+#        rel_vel = (self.velocity-self.target.velocity)
         r_vec = (to_target - rel_vel).direction()*self.ACCELERATION
         
 #        pos_locks = [s for s in self.world.agents if (isinstance(s, Ship) and (s != self.source))]

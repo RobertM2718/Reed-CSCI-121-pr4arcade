@@ -199,6 +199,7 @@ class Host(Frame): #inherit from Game?
             len_data = str(len(cmds))
             to_send = ("0"*(16-len(len_data)) + len_data).encode('ascii') + cmds
             self.connections[i][0].sendall(to_send)
+#            print(len(to_send))
     
     def add(self, agent):
         self.agents.append(agent)
