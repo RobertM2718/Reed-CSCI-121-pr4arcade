@@ -1,0 +1,17 @@
+IMPROVEMENTS MADE:
+
+basic platform (10 points): The game works, okay?
+
+a new kind of antagonist (2 points): Arguably the other players?  Not so sure about this one.  
+
+limited power (2 points): The ship has limited energy for Photons.  
+
+game over/you win (4 points): The ship explodes, and changes color.   
+
+multiplayer (4 points): The game's multiplayer, okay?
+
+artificial intelligence (4): I'm claiming this because of the seeker missiles I implemented.  I think they're pretty smart about how they track down enemies.  
+
+choose your own: 
+	(10 points): The game works in real-time over a network.  That's the main point of it.  I think that's worth a decent amount of points.  
+	(5 points): You can remap the controls.  
