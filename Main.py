@@ -8,6 +8,8 @@ Created on Mon Nov 20 21:24:31 2017
 import Host
 import Client
 import time
+import socket
+
 
 #c = Client.Client("hi", 60, 45, 800, 600, 'wrapped', 0)
 #h = Host.Host("No", 60, 45, 800, 600, 'wrapped', 0)
@@ -46,15 +48,22 @@ while True:
 #                print("Invalid IP address.  Try again.")
 #            else:
 #                break
-        while True:
+        done = False
+        while not done:
+            port = input("Port number? (int or 'default')  ")
+            if port.lower() == 'default':
+                done = True
+                port = 10000
+                num_cns = 1
+                break
             try:
-                port = int(input("Port number?  (probably 10000)  "))
+                port = int(port)
             except ValueError:
                 print("Port must be an integer.  Try again.")
                 continue #will this work?  Yes!
             break
 #        address = ('localhost', port) #does the first part of address need to be determined after the socket is made?  Probably.  
-        while True:
+        while not done:
             try:
                 num_cns = int(input("Number of players?  (probably at least 1)  "))
             except ValueError:
@@ -77,27 +86,34 @@ while True:
         #???? There needs to be some way of verifying that a proper connection was formed.  
         #Note: there sort of is: I could use try/except with a ConnectionRefusedError.  Maybe a few other errors, too.  
 #        address = input("Host address?  Example: 'localhost'  ") #example may need to be changed
-        while True:
-            while True:
-                address = input("Host IP address?  ")
-                if len(address.split(".")) < 4 or len(address.split(".")) > 5:
+        done = False
+        while not done:
+            while not done:
+                address = input("Host IP address?  (Valid IP or 'localhost')  ")
+                if address.lower() == 'localhost':
+                    done = True
+                    address = socket.gethostbyname(socket.gethostname())
+                    port = 10000
+                elif len(address.split(".")) < 4 or len(address.split(".")) > 5:
                     print("Invalid address.  Try again.")
                 else:
                     break
                 
-            while True:
+            while not done:
                 try:
-                    port = int(input("Port number?  (probably 10000)  "))
+                    port = int(input("Port number?  "))
                 except ValueError:
                     print("Port must be an integer.  Try again.")
                     continue #will this work?  Yes!
                 break
             try:
                 c.set_host((address, port))
+                done = True
             except ConnectionRefusedError:
                 print("Connection failed.  Try again.")
-                continue
-            break #should I be consistent in how I get out of these loops?
+                done = False
+#                continue
+             #should I be consistent in how I get out of these loops?
         while not c.GAME_OVER: 
             c.update()
 #        new_test = input("This is a test, please work (also, press enter to close)") #Didn't work - it kept freezing the program.  

@@ -534,17 +534,20 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
         self.energy = self.MAX_ENERGY
         self.missiles = self.STARTING_MISSILES
         self.weapons_on = False
-        
+        self.firing_at = Point2D()
+        self.braking = False        
         self.thrust = 0
         self.spin = 0
         self.firing_photons = False
         self.firing_missiles = False
-        exhaust = ShipExhaust(self)
-        self.firing_at = Point2D()
-        self.braking = False
-        
-        self.dependants.append(exhaust)
         self.frames_till_missile = 0
+        
+        exhaust = ShipExhaust(self)
+        self.dependants.append(exhaust)
+        energy_indicator = EnergyIndicator(self)
+        self.dependants.append(energy_indicator)
+        missile_indicator = MissileIndicator(self)
+        self.dependants.append(missile_indicator)
         
         #for when wrecked:
         self.wrecked = False
@@ -622,11 +625,15 @@ class Ship(MovingBody): #I have to find a way to update a ship's rotation
             self.firing_missiles = (pv[1] == "True")
             
         elif pv[0] == "firing_at":
-            xy = [float(i) for i in pv[1].split(",")]
-            self.firing_at = Point2D(xy[0], xy[1])
+            if pv[1] == 'mouseoff':
+                self.firing_at = self.position + self.get_heading()*2.0
+            else:
+                xy = [float(i) for i in pv[1].split(",")]
+                self.firing_at = Point2D(xy[0], xy[1])
             
         elif pv[0] == "braking":
             self.braking = float(pv[1])
+            
             
             
             
@@ -725,11 +732,39 @@ class ShipExhaust(MovingBody): #Alternatively, I could have the ship fire embers
         return "#EF6221" #A dull orange
     
 class EnergyIndicator(Flash):
+    RADIUS = 0.575 - 0.15 #determined by trigonometry
+    
+    def __init__(self, ship):
+        self.ship = ship
+        Flash.__init__(self, self.ship.position, self.ship.world, self.RADIUS, 10) #The 10 is only there because Flash.__init__ requires me to pass a value for the lifetime, even if I'm not going to use it.  
+    
     def update(self):
-        self.position = self.ship.position + Vector2D()
+        self.position = self.ship.position + Vector2D() #Again, to avoid copying
+        
+    def color(self): #This is the same method of converting to hex I used in Boids.  
+        if self.ship.wrecked:
+            return self.ship.color()
+        else:
+            percent = self.ship.energy/self.ship.MAX_ENERGY
+            color_value = int(1-255 * percent)
+            all_hex = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
+            return "#" + (all_hex[color_value // 16] + all_hex[color_value % 16])*2 + "FF"
+#        return "#0000" + all_hex[color_value // 16] + all_hex[color_value % 16] #Change later to be based on ship.energy
+        
+        
+class MissileIndicator(EnergyIndicator):
+    RADIUS = 0.2
+    def update(self):
+        self.position = self.ship.position + self.ship.get_heading() * 1.5
+            
+    def shape(self):
+        if self.ship.frames_till_missile == 0 and self.ship.missiles >= 1:
+            return EnergyIndicator.shape(self)
+        else:
+            return [self.position + Vector2D(), self.position + Vector2D()]
         
     def color(self):
-        return "FFFFFF" #Change later to be based on ship.energy
+        return "#FF0000" #red
 
 #class PlayAsteroids(Game):
 #

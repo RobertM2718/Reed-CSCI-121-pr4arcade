@@ -35,16 +35,23 @@ import math
 
 
 
-THRUST_KEY = 'w'
-BRAKE_KEY = 's' #is braking something I want to allow?
-LEFT_KEY = 'a'
-RIGHT_KEY = 'd'
-#FIRE_KEY = ' '
-QUIT_KEY = 'p'
+#THRUST_KEY = 'w'
+#BRAKE_KEY = 's' #is braking something I want to allow?
+#LEFT_KEY = 'a'
+#RIGHT_KEY = 'd'
+##FIRE_KEY = ' '
+#QUIT_KEY = 'p'
 
-#with f as open("bindings.txt", 'r'):
-#    line = f.readline()
-#    while line != None:
+with open("bindings.txt", 'r') as f:
+    lines = f.readlines()
+    THRUST_KEY = lines[0].replace("\n", "")
+    BRAKE_KEY = lines[1].replace("\n", "")
+    LEFT_KEY = lines[2].replace("\n", "")
+    RIGHT_KEY = lines[3].replace("\n", "")
+    MOUSEMODE = (lines[4].replace("\n", "") == "True")
+    PHOTON_KEY = lines[5].replace("\n", "")
+    MISSILE_KEY = lines[6].replace("\n", "")
+    QUIT_KEY = lines[7].replace("\n", "")
         
 
 class Client(Frame):
@@ -89,6 +96,8 @@ class Client(Frame):
 #                            "SmallAsteroid": PlayAsteroids.SmallAsteroid, "MediumAsteroid": PlayAsteroids.MediumAsteroid,
 #                            "LargeAsteroid": PlayAsteroids.LargeAsteroid, "Photon": PlayAsteroids.Photon, 
 #                            "Ship": PlayAsteroids.Ship}
+        if not MOUSEMODE:
+            self.report_strings['firing_at'] = "mouseoff"
         self.draw_string = ""
         self.target_angle_1 = 45
         self.target_angle_2 = 135
@@ -221,27 +230,32 @@ class Client(Frame):
         
     def handle_mouse_motion(self,event): #client
         self.mouse_position = self.window_to_world(event.x,event.y)
-        self.report_strings["firing_at"] = str(self.mouse_position.x) + "," + str(self.mouse_position.y)
+        if MOUSEMODE:
+            self.report_strings["firing_at"] = str(self.mouse_position.x) + "," + str(self.mouse_position.y)
         #print("MOUSE MOVED",self.mouse_position,self.mouse_down)
 
     def handle_left_mouse_press(self,event): #client
         self.mouse_down = True
-        self.report_strings["firing_photons"] = True
+        if MOUSEMODE:
+            self.report_strings["firing_photons"] = True
         self.handle_mouse_motion(event)
         #print("MOUSE CLICKED",self.mouse_down)
 
     def handle_left_mouse_release(self,event): #client
         self.mouse_down = False
-        self.report_strings["firing_photons"] = False
+        if MOUSEMODE:
+            self.report_strings["firing_photons"] = False
         self.handle_mouse_motion(event)
         #print("MOUSE RELEASED",self.mouse_down)
         
     def handle_right_mouse_press(self, event):
-        self.report_strings["firing_missiles"] = True
+        if MOUSEMODE:
+            self.report_strings["firing_missiles"] = True
         self.handle_mouse_motion(event)
         
     def handle_right_mouse_release(self, event):
-        self.report_strings["firing_missiles"] = False
+        if MOUSEMODE:
+            self.report_strings["firing_missiles"] = False
         self.handle_mouse_motion(event)
 
     def handle_keypress(self,event): #both (so the host can quit)
@@ -274,6 +288,11 @@ class Client(Frame):
 #            self.report_strings["firing_missiles"] = True
         elif event.char == BRAKE_KEY:
             self.report_strings["braking"] = 1
+        elif not MOUSEMODE:
+            if event.char == PHOTON_KEY:
+                self.report_strings["firing_photons"] = True
+            elif event.char == MISSILE_KEY:
+                self.report_strings["firing_missiles"] = True
             
     def handle_keyrelease(self, event):
         if event.char == THRUST_KEY:
@@ -292,6 +311,11 @@ class Client(Frame):
 #            self.report_strings["firing_missiles"] = False
         elif event.char == BRAKE_KEY:
             self.report_strings["braking"] = 0
+        elif not MOUSEMODE:
+            if event.char == PHOTON_KEY:
+                self.report_strings["firing_photons"] = False
+            elif event.char == MISSILE_KEY:
+                self.report_strings["firing_missiles"] = False
         
         
     
