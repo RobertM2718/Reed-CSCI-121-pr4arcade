@@ -758,7 +758,7 @@ class MissileIndicator(EnergyIndicator):
         self.position = self.ship.position + self.ship.get_heading() * 1.5
             
     def shape(self):
-        if self.ship.frames_till_missile == 0 and self.ship.missiles >= 1:
+        if self.ship.frames_till_missile == 0 and self.ship.missiles >= 1 and not self.ship.wrecked:
             return EnergyIndicator.shape(self)
         else:
             return [self.position + Vector2D(), self.position + Vector2D()]
